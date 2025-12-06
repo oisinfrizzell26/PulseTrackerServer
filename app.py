@@ -1,7 +1,12 @@
 import os
 import threading
+import logging
 from flask import Flask, jsonify, request
 from models import db, HeartRate
+
+# Disable Flask request logging (only show errors)
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.ERROR)
 
 app = Flask(__name__)
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -34,7 +39,7 @@ def log_pulse():
     db.session.add(new_reading)
     db.session.commit()
     
-    print(f"\n[DATA RECEIVED] Heart Rate: {data['rate']} BPM (Mode: {current_mode})")
+    # print(f"\n[DATA RECEIVED] Heart Rate: {data['rate']} BPM (Mode: {current_mode})")
     return jsonify({"status": "success"}), 201
 
 def run_server():
