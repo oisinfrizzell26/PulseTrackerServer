@@ -1,7 +1,14 @@
+import os
 import threading
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
+from models import db, HeartRate
 
 app = Flask(__name__)
+basedir = os.path.abspath(os.path.dirname(__file__))
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'pulsetracker.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+db.init_app(app)
 
 # Global variable to store the current mode
 # 0 = None, 1 = Fitness Mode, 2 = Lap Mode
@@ -16,11 +23,29 @@ def get_mode():
     # The ESP32 will call this to find out what to do
     return jsonify({"mode": current_mode})
 
+@app.route("/log-pulse", methods=["POST"])
+def log_pulse():
+    data = request.get_json()
+    if not data or 'rate' not in data:
+        return jsonify({"error": "No rate provided"}), 400
+    
+    # Create a new record using the ORM
+    new_reading = HeartRate(rate=data['rate'], mode=current_mode)
+    db.session.add(new_reading)
+    db.session.commit()
+    
+    print(f"\n[DATA RECEIVED] Heart Rate: {data['rate']} BPM (Mode: {current_mode})")
+    return jsonify({"status": "success"}), 201
+
 def run_server():
     # Run Flask without the reloader so it works well in a thread
     app.run(host="0.0.0.0", port=5001, debug=False, use_reloader=False)
 
 if __name__ == "__main__":
+    # Create the database tables if they don't exist
+    with app.app_context():
+        db.create_all()
+
     # Start Flask in a separate thread so we can use the terminal for input
     server_thread = threading.Thread(target=run_server)
     server_thread.daemon = True
