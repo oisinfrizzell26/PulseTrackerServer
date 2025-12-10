@@ -1,3 +1,4 @@
+import time
 import paho.mqtt.client as mqtt
 
 # MQTT Configuration
@@ -7,6 +8,7 @@ CLIENT_ID = "pulsetracker_server_oisin"
 
 # Topics
 TOPIC_MODE = "pulsetracker/mode"
+TOPIC_HEART = "pulsetracker/heartRate"
 
 def on_connect(client, userdata, flags, reason_code, properties):
     if reason_code.is_failure:
@@ -20,6 +22,17 @@ def on_publish(client, userdata, mid, reason_code, properties):
     else:
         print(f"📤 Message published successfully")
 
+def on_message(client, userdata, msg):
+    topic = msg.topic
+    payload = msg.payload.decode()
+
+    if topic == TOPIC_HEART:
+        print(f"\n❤️ Heart rate message from ESP32: {payload}")
+    elif topic == TOPIC_MODE:
+        print(f"\n📥 Mode message received: {payload}")
+    else:
+        print(f"\n📩 Message on {topic}: {payload}")
+
 def main():
     print("🚀 PulseTracker MQTT Server")
     print("=" * 30)
@@ -28,17 +41,20 @@ def main():
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, CLIENT_ID)
     client.on_connect = on_connect
     client.on_publish = on_publish
+    client.on_message = on_message   # ✅ attach the message callback
     
-    # Connect to broker
     print(f"🔄 Connecting to {MQTT_BROKER}...")
     try:
         client.connect(MQTT_BROKER, MQTT_PORT, 60)
         client.loop_start()
         
         # Give time to connect
-        import time
         time.sleep(2)
-        
+
+        # ✅ subscribe to topics you care about
+        client.subscribe(TOPIC_HEART)
+        client.subscribe(TOPIC_MODE)
+
         print("\n📋 Mode Selection:")
         
         while True:
