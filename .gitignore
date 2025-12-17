@@ -5,3 +5,7 @@ instance/
 pulsetracker.db
 venv/
 .env
+pulsetracker.db
+tests/
+.vscode/
+.env.example

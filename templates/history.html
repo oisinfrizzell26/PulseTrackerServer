@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workout History - PulseTracker</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .nav {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .nav a {
+            color: white;
+            text-decoration: none;
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 25px;
+            transition: all 0.3s;
+        }
+
+        .nav a:hover, .nav a.active {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+
+        .filter-tabs {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .filter-tab {
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            border-radius: 20px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .filter-tab:hover, .filter-tab.active {
+            background: rgba(0, 255, 136, 0.3);
+        }
+
+        .workouts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+
+        .workout-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 2px solid transparent;
+        }
+
+        .workout-card:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: #00ff88;
+            transform: translateY(-2px);
+        }
+
+        .workout-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .workout-mode {
+            font-size: 1.4em;
+            font-weight: bold;
+            color: #00ff88;
+        }
+
+        .workout-date {
+            font-size: 0.9em;
+            opacity: 0.7;
+        }
+
+        .workout-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .stat-item {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        .stat-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #00ccff;
+        }
+
+        .stat-label {
+            font-size: 0.85em;
+            opacity: 0.8;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 0.8em;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+
+        .status-completed {
+            background: #00ff88;
+            color: #333;
+        }
+
+        .status-stopped {
+            background: #ffd700;
+            color: #333;
+        }
+
+        .status-active {
+            background: #00ccff;
+            color: #333;
+        }
+
+        .no-workouts {
+            text-align: center;
+            padding: 60px 20px;
+            opacity: 0.7;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            overflow-y: auto;
+        }
+
+        .modal-content {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 50px auto;
+            padding: 30px;
+            max-width: 1000px;
+            border-radius: 20px;
+            position: relative;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            font-size: 2em;
+            cursor: pointer;
+            color: white;
+            background: none;
+            border: none;
+        }
+
+        .close-btn:hover {
+            color: #00ff88;
+        }
+
+        .modal-header {
+            margin-bottom: 30px;
+        }
+
+        .laps-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .laps-table th,
+        .laps-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .laps-table th {
+            background: rgba(255, 255, 255, 0.1);
+            font-weight: bold;
+        }
+
+        .laps-table tr:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .chart-container {
+            position: relative;
+            height: 250px;
+            width: 100%;
+            margin: 20px 0;
+        }
+
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Workout History</h1>
+        </div>
+
+        <div class="nav">
+            <a href="/">Dashboard</a>
+            <a href="/workout">Active Workout</a>
+            <a href="/history" class="active">History</a>
+        </div>
+
+        <div class="card">
+            <h3>Filter by Category</h3>
+            <div class="filter-tabs" id="filterTabs">
+                <button class="filter-tab active" onclick="filterWorkouts('all')">All Workouts</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Your Workouts</h3>
+            <div class="workouts-grid" id="workoutsGrid">
+                <div class="no-workouts">
+                    <h3>No workouts yet</h3>
+                    <p>Complete a workout to see it here!</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Workout Details Modal -->
+    <div id="workoutModal" class="modal">
+        <div class="modal-content card">
+            <button class="close-btn" onclick="closeModal()">&times;</button>
+            <div id="modalContent"></div>
+        </div>
+    </div>
+
+    <script>
+        let allWorkouts = [];
+        let workoutsByCategory = {};
+        let currentFilter = 'all';
+        let detailChart = null;
+
+        function formatTime(ms) {
+            if (!ms) return '--';
+            const minutes = Math.floor(ms / 60000);
+            const seconds = Math.floor((ms % 60000) / 1000);
+            const millis = ms % 1000;
+            return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${millis.toString().padStart(3, '0')}`;
+        }
+
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleString('en-US', { 
+                month: 'short', 
+                day: 'numeric', 
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        async function fetchWorkouts() {
+            try {
+                const [workoutsRes, categoriesRes] = await Promise.all([
+                    fetch('/api/workouts'),
+                    fetch('/api/workouts/by-category')
+                ]);
+                
+                allWorkouts = await workoutsRes.json();
+                workoutsByCategory = await categoriesRes.json();
+                
+                displayFilterTabs();
+                displayWorkouts();
+                
+            } catch (error) {
+                console.error('Error fetching workouts:', error);
+            }
+        }
+
+        function displayFilterTabs() {
+            const tabsContainer = document.getElementById('filterTabs');
+            const categories = Object.keys(workoutsByCategory);
+            
+            const tabs = ['<button class="filter-tab active" onclick="filterWorkouts(\'all\')">All Workouts</button>'];
+            categories.forEach(category => {
+                tabs.push(`<button class="filter-tab" onclick="filterWorkouts('${category}')">${category}</button>`);
+            });
+            
+            tabsContainer.innerHTML = tabs.join('');
+        }
+
+        function filterWorkouts(filter) {
+            currentFilter = filter;
+            
+            // Update active tab
+            document.querySelectorAll('.filter-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            displayWorkouts();
+        }
+
+        function displayWorkouts() {
+            const container = document.getElementById('workoutsGrid');
+            
+            let workoutsToShow = [];
+            if (currentFilter === 'all') {
+                workoutsToShow = allWorkouts;
+            } else {
+                workoutsToShow = workoutsByCategory[currentFilter] || [];
+            }
+            
+            if (workoutsToShow.length === 0) {
+                container.innerHTML = `
+                    <div class="no-workouts">
+                        <h3>No workouts found</h3>
+                        <p>Complete a workout to see it here!</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = workoutsToShow.map(workout => `
+                <div class="workout-card" onclick="showWorkoutDetails(${workout.id})">
+                    <div class="workout-card-header">
+                        <div class="workout-mode">${workout.mode}</div>
+                        <div class="workout-date">${formatDate(workout.started_at)}</div>
+                    </div>
+                    
+                    <span class="status-badge status-${workout.status}">${workout.status.toUpperCase()}</span>
+                    
+                    <div class="workout-stats">
+                        <div class="stat-item">
+                            <div class="stat-value">${workout.total_laps || workout.lap_count || 0}</div>
+                            <div class="stat-label">Total Laps</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">${formatTime(workout.total_time_ms)}</div>
+                            <div class="stat-label">Total Time</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">${workout.avg_heart_rate || '--'}</div>
+                            <div class="stat-label">Avg BPM</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">${workout.max_heart_rate || '--'}</div>
+                            <div class="stat-label">Max BPM</div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function showWorkoutDetails(workoutId) {
+            try {
+                const response = await fetch(`/api/workouts/${workoutId}`);
+                const data = await response.json();
+                
+                if (!data.workout) return;
+                
+                const { workout, laps, heart_rates } = data;
+                
+                document.getElementById('modalContent').innerHTML = `
+                    <div class="modal-header">
+                        <h2>${workout.mode} - Workout #${workout.id}</h2>
+                        <p style="opacity: 0.8;">${formatDate(workout.started_at)}</p>
+                    </div>
+
+                    <div class="summary-stats card">
+                        <div class="stat-item">
+                            <div class="stat-value">${workout.total_laps}</div>
+                            <div class="stat-label">Total Laps</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">${formatTime(workout.total_time_ms)}</div>
+                            <div class="stat-label">Total Time</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">${workout.avg_heart_rate || '--'}</div>
+                            <div class="stat-label">Avg BPM</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">${workout.max_heart_rate || '--'}</div>
+                            <div class="stat-label">Max BPM</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">${workout.min_heart_rate || '--'}</div>
+                            <div class="stat-label">Min BPM</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-label">Status</div>
+                            <span class="status-badge status-${workout.status}">${workout.status.toUpperCase()}</span>
+                        </div>
+                    </div>
+
+                    ${heart_rates && heart_rates.length > 0 ? `
+                        <div class="card">
+                            <h3>💓 Heart Rate Graph</h3>
+                            <div class="chart-container">
+                                <canvas id="detailChart"></canvas>
+                            </div>
+                        </div>
+                    ` : ''}
+
+                    ${laps && laps.length > 0 ? `
+                        <div class="card">
+                            <h3>🏁 Lap Details</h3>
+                            <table class="laps-table">
+                                <thead>
+                                    <tr>
+                                        <th>Lap</th>
+                                        <th>Lap Time</th>
+                                        <th>Split Time</th>
+                                        <th>Avg HR</th>
+                                        <th>Max HR</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${laps.map(lap => `
+                                        <tr>
+                                            <td><strong>Lap ${lap.lap_number}</strong></td>
+                                            <td>${formatTime(lap.lap_time_ms)}</td>
+                                            <td>${formatTime(lap.split_time_ms)}</td>
+                                            <td>${lap.avg_heart_rate || '--'}</td>
+                                            <td>${lap.max_heart_rate || '--'}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    ` : ''}
+                `;
+                
+                document.getElementById('workoutModal').style.display = 'block';
+                
+                // Initialize chart if heart rate data exists
+                if (heart_rates && heart_rates.length > 0) {
+                    setTimeout(() => initDetailChart(heart_rates), 100);
+                }
+                
+            } catch (error) {
+                console.error('Error fetching workout details:', error);
+            }
+        }
+
+        function initDetailChart(heartRates) {
+            const canvas = document.getElementById('detailChart');
+            if (!canvas) return;
+
+            if (detailChart) {
+                detailChart.destroy();
+            }
+
+            const ctx = canvas.getContext('2d');
+            const labels = heartRates.map((hr, index) => index);
+            const values = heartRates.map(hr => hr.heart_rate);
+
+            detailChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Heart Rate (BPM)',
+                        data: values,
+                        borderColor: '#00ff88',
+                        backgroundColor: 'rgba(0, 255, 136, 0.1)',
+                        tension: 0.4,
+                        fill: true,
+                        pointRadius: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: 'white' }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: 'white', maxTicksLimit: 10 },
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                        },
+                        y: {
+                            ticks: { color: 'white' },
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function closeModal() {
+            document.getElementById('workoutModal').style.display = 'none';
+            if (detailChart) {
+                detailChart.destroy();
+                detailChart = null;
+            }
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('workoutModal');
+            if (event.target == modal) {
+                closeModal();
+            }
+        }
+
+        // Fetch workouts on load
+        fetchWorkouts();
+
+        // Refresh every 5 seconds
+        setInterval(fetchWorkouts, 5000);
+    </script>
+</body>
+</html>

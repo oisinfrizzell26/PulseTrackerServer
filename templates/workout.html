@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Active Workout - PulseTracker</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .nav {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .nav a {
+            color: white;
+            text-decoration: none;
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 25px;
+            transition: all 0.3s;
+        }
+
+        .nav a:hover, .nav a.active {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+
+        .workout-header {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-box {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .stat-value {
+            font-size: 3em;
+            font-weight: bold;
+            color: #00ff88;
+        }
+
+        .stat-label {
+            font-size: 1em;
+            opacity: 0.8;
+            margin-top: 5px;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+            margin-bottom: 30px;
+        }
+
+        .laps-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .laps-table th,
+        .laps-table td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .laps-table th {
+            background: rgba(255, 255, 255, 0.1);
+            font-weight: bold;
+        }
+
+        .laps-table tr:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .no-workout {
+            text-align: center;
+            padding: 60px 20px;
+            opacity: 0.7;
+        }
+
+        .no-workout h2 {
+            margin-bottom: 20px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+
+        .status-running {
+            background: #00ff88;
+            color: #333;
+        }
+
+        .status-paused {
+            background: #ffd700;
+            color: #333;
+        }
+
+        .status-done {
+            background: #00ccff;
+            color: #333;
+        }
+
+        .current-lap {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏃‍♂️ Active Workout</h1>
+        </div>
+
+        <div class="nav">
+            <a href="/">Dashboard</a>
+            <a href="/workout" class="active">Active Workout</a>
+            <a href="/history">History</a>
+        </div>
+
+        <div id="workoutContent">
+            <div class="no-workout">
+                <h2>No Active Workout</h2>
+                <p>Start a workout on your device to see real-time data here.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let heartRateChart;
+        let currentWorkoutId = null;
+
+        function initChart() {
+            const canvas = document.getElementById('heartRateChart');
+            if (!canvas) return;
+
+            const ctx = canvas.getContext('2d');
+            heartRateChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Heart Rate (BPM)',
+                        data: [],
+                        borderColor: '#00ff88',
+                        backgroundColor: 'rgba(0, 255, 136, 0.1)',
+                        tension: 0.4,
+                        fill: true,
+                        pointRadius: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: 'white' }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: 'white', maxTicksLimit: 10 },
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                        },
+                        y: {
+                            ticks: { color: 'white' },
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                            suggestedMin: 60,
+                            suggestedMax: 180
+                        }
+                    }
+                }
+            });
+        }
+
+        function formatTime(ms) {
+            const minutes = Math.floor(ms / 60000);
+            const seconds = Math.floor((ms % 60000) / 1000);
+            const millis = ms % 1000;
+            return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${millis.toString().padStart(3, '0')}`;
+        }
+
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleTimeString();
+        }
+
+        async function fetchActiveWorkout() {
+            try {
+                const response = await fetch('/api/active-workout');
+                const data = await response.json();
+                
+                if (data.active === false || !data.workout) {
+                    showNoWorkout();
+                    return;
+                }
+
+                const { workout, laps, heart_rates, current_status } = data;
+                currentWorkoutId = workout.id;
+                
+                displayWorkout(workout, laps, heart_rates, current_status);
+                updateChart(heart_rates);
+                
+            } catch (error) {
+                console.error('Error fetching workout:', error);
+            }
+        }
+
+        function showNoWorkout() {
+            document.getElementById('workoutContent').innerHTML = `
+                <div class="no-workout">
+                    <h2>No Active Workout</h2>
+                    <p>Start a workout on your device to see real-time data here.</p>
+                </div>
+            `;
+        }
+
+        function displayWorkout(workout, laps, heartRates, status) {
+            const elapsedTime = status.state === 'running' ? 'In Progress' : formatTime(workout.total_time_ms || 0);
+            const statusClass = status.state === 'running' ? 'status-running' : 'status-paused';
+            
+            // Calculate current heart rate stats
+            let currentHR = '--';
+            let avgHR = '--';
+            let maxHR = '--';
+            
+            if (heartRates && heartRates.length > 0) {
+                const hrValues = heartRates.map(hr => hr.heart_rate);
+                currentHR = hrValues[hrValues.length - 1];
+                avgHR = Math.round(hrValues.reduce((a, b) => a + b, 0) / hrValues.length);
+                maxHR = Math.max(...hrValues);
+            }
+
+            document.getElementById('workoutContent').innerHTML = `
+                <div class="card workout-header">
+                    <div class="stat-box">
+                        <div class="stat-value">${workout.mode}</div>
+                        <div class="stat-label">Mode</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value">${status.current_lap}/${status.total_laps}</div>
+                        <div class="stat-label">Current Lap</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value">${currentHR}</div>
+                        <div class="stat-label">Current BPM</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value">${avgHR}</div>
+                        <div class="stat-label">Average BPM</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value">${maxHR}</div>
+                        <div class="stat-label">Max BPM</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">Status</div>
+                        <div style="margin-top: 10px;">
+                            <span class="status-badge ${statusClass}">${status.state.toUpperCase()}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>💓 Heart Rate Monitor</h3>
+                    <div class="chart-container">
+                        <canvas id="heartRateChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>🏁 Lap Times</h3>
+                    ${laps.length > 0 ? `
+                        <table class="laps-table">
+                            <thead>
+                                <tr>
+                                    <th>Lap</th>
+                                    <th>Lap Time</th>
+                                    <th>Split Time</th>
+                                    <th>Avg HR</th>
+                                    <th>Max HR</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${laps.map((lap, index) => `
+                                    <tr class="${lap.lap_number === status.current_lap - 1 ? 'current-lap' : ''}">
+                                        <td><strong>Lap ${lap.lap_number}</strong></td>
+                                        <td>${formatTime(lap.lap_time_ms)}</td>
+                                        <td>${formatTime(lap.split_time_ms)}</td>
+                                        <td>${lap.avg_heart_rate || '--'}</td>
+                                        <td>${lap.max_heart_rate || '--'}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    ` : '<p style="opacity: 0.7; padding: 20px;">No laps completed yet...</p>'}
+                </div>
+
+                <div class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <strong>Started:</strong> ${status.started_at || formatDate(workout.started_at)}
+                        </div>
+                        <div>
+                            <strong>Workout ID:</strong> #${workout.id}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Initialize chart after adding to DOM
+            setTimeout(initChart, 100);
+        }
+
+        function updateChart(heartRates) {
+            if (!heartRateChart || !heartRates) return;
+
+            const labels = heartRates.map((hr, index) => index);
+            const values = heartRates.map(hr => hr.heart_rate);
+
+            heartRateChart.data.labels = labels;
+            heartRateChart.data.datasets[0].data = values;
+            heartRateChart.update('none');
+        }
+
+        // Fetch data on load
+        fetchActiveWorkout();
+
+        // Update every 1 second
+        setInterval(fetchActiveWorkout, 1000);
+    </script>
+</body>
+</html>
