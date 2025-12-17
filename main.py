@@ -2,7 +2,7 @@ import time
 import paho.mqtt.client as mqtt
 
 # MQTT Configuration
-MQTT_BROKER = "172.20.10.6"
+MQTT_BROKER = "172.20.10.3"
 MQTT_PORT = 1883
 CLIENT_ID = "pulsetracker_server_oisin"
 
