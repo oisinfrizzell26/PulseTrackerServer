@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PulseTracker Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-item {
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .stat-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #00ff88;
+        }
+        
+        .stat-label {
+            font-size: 1.1em;
+            opacity: 0.8;
+        }
+        
+        .controls {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .btn {
+            background: linear-gradient(45deg, #00ff88, #00ccff);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            margin: 0 10px;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 255, 136, 0.4);
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 400px;
+            width: 100%;
+        }
+        
+        .status {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+        }
+        
+        .status-online {
+            color: #00ff88;
+        }
+        
+        .status-offline {
+            color: #ff4757;
+        }
+
+        .workout-section {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .workout-event {
+            background: rgba(255, 255, 255, 0.05);
+            border-left: 4px solid #00ff88;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+        }
+
+        .workout-event.start {
+            border-left-color: #00ff88;
+        }
+
+        .workout-event.lap {
+            border-left-color: #00ccff;
+        }
+
+        .workout-event.done {
+            border-left-color: #ffd700;
+        }
+
+        .workout-event.stop {
+            border-left-color: #ff4757;
+        }
+
+        .workout-time {
+            font-size: 0.9em;
+            opacity: 0.7;
+            margin-bottom: 5px;
+        }
+
+        .workout-data {
+            font-size: 1.1em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🫀 PulseTracker Dashboard</h1>
+            <p>Real-time heart rate monitoring for your workouts</p>
+        </div>
+
+        <div class="stats">
+            <div class="card stat-item">
+                <div class="stat-value" id="currentHeartRate">--</div>
+                <div class="stat-label">Current BPM</div>
+            </div>
+            <div class="card stat-item">
+                <div class="stat-value" id="averageHeartRate">--</div>
+                <div class="stat-label">Average BPM</div>
+            </div>
+            <div class="card stat-item">
+                <div class="stat-value" id="maxHeartRate">--</div>
+                <div class="stat-label">Max BPM</div>
+            </div>
+            <div class="card stat-item">
+                <div class="stat-value" id="currentMode">None</div>
+                <div class="stat-label">Current Mode</div>
+            </div>
+            <div class="card stat-item">
+                <div class="stat-value" id="currentLap">--</div>
+                <div class="stat-label">Current Lap</div>
+            </div>
+            <div class="card stat-item">
+                <div class="stat-value" id="workoutState">Idle</div>
+                <div class="stat-label">Workout State</div>
+            </div>
+        </div>
+
+        <div class="card controls">
+            <h3>Running Modes</h3>
+            <button class="btn" onclick="setMode('1')">🏃‍♂️ Fitness Mode</button>
+            <button class="btn" onclick="setMode('2')">🏁 Lap Mode</button>
+        </div>
+
+        <div class="card">
+            <h3>Heart Rate Chart</h3>
+            <div class="chart-container">
+                <canvas id="heartRateChart"></canvas>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>🏋️ Workout Events</h3>
+            <div class="workout-section" id="workoutEvents">
+                <p style="opacity: 0.5;">No workout data yet...</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="status">
+                <span>ESP32 Status:</span>
+                <span id="connectionStatus" class="status-offline">Disconnected</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let heartRateChart;
+        let heartRateData = [];
+
+        // Initialize chart
+        function initChart() {
+            const ctx = document.getElementById('heartRateChart').getContext('2d');
+            heartRateChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Heart Rate (BPM)',
+                        data: [],
+                        borderColor: '#00ff88',
+                        backgroundColor: 'rgba(0, 255, 136, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: 'white'
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: 'white' },
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                        },
+                        y: {
+                            ticks: { color: 'white' },
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Fetch heart rate data
+        async function fetchHeartRate() {
+            try {
+                const response = await fetch('/api/heart-rate');
+                const data = await response.json();
+                
+                heartRateData = data.data;
+                updateChart();
+                updateStats();
+                updateStatus(data.current_mode);
+                
+                // Update connection status
+                document.getElementById('connectionStatus').textContent = 'Connected';
+                document.getElementById('connectionStatus').className = 'status-online';
+                
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                document.getElementById('connectionStatus').textContent = 'Disconnected';
+                document.getElementById('connectionStatus').className = 'status-offline';
+            }
+        }
+
+        // Fetch workout data
+        async function fetchWorkoutData() {
+            try {
+                const response = await fetch('/api/workout-data');
+                const data = await response.json();
+                updateWorkoutEvents(data.data);
+                updateWorkoutStatus(data.current_status);
+            } catch (error) {
+                console.error('Error fetching workout data:', error);
+            }
+        }
+
+        // Update workout status display
+        function updateWorkoutStatus(status) {
+            if (status.active) {
+                const lapText = status.total_laps > 0 
+                    ? `${status.current_lap}/${status.total_laps}`
+                    : status.current_lap;
+                document.getElementById('currentLap').textContent = lapText;
+                document.getElementById('workoutState').textContent = status.state || 'Running';
+                document.getElementById('workoutState').style.color = '#00ff88';
+            } else {
+                document.getElementById('currentLap').textContent = '--';
+                document.getElementById('workoutState').textContent = status.state || 'Idle';
+                document.getElementById('workoutState').style.color = '#ffffff';
+            }
+        }
+
+        // Update workout events display
+        function updateWorkoutEvents(events) {
+            const container = document.getElementById('workoutEvents');
+            
+            if (!events || events.length === 0) {
+                container.innerHTML = '<p style="opacity: 0.5;">No workout data yet...</p>';
+                return;
+            }
+
+            // Show most recent events first
+            const recentEvents = events.slice(-10).reverse();
+            
+            container.innerHTML = recentEvents.map(event => {
+                try {
+                    const workoutData = JSON.parse(event.data);
+                    const eventType = workoutData.event || 'unknown';
+                    
+                    let eventText = '';
+                    switch(eventType) {
+                        case 'start':
+                            eventText = `🚀 <strong>Workout Started:</strong> ${workoutData.mode} (${workoutData.laps} laps)`;
+                            break;
+                        case 'lap':
+                            const lapTime = formatTime(workoutData.lap_ms);
+                            const splitTime = formatTime(workoutData.split_ms);
+                            eventText = `🏁 <strong>Lap ${workoutData.lap}:</strong> ${lapTime} (Split: ${splitTime})`;
+                            break;
+                        case 'done':
+                            const totalTime = formatTime(workoutData.total_ms);
+                            eventText = `✅ <strong>Workout Complete:</strong> ${workoutData.laps} laps in ${totalTime}`;
+                            break;
+                        case 'stop':
+                            eventText = `⏸️ <strong>Workout Stopped:</strong> ${workoutData.laps} laps completed`;
+                            break;
+                        case 'status':
+                            eventText = `📊 <strong>Status:</strong> Lap ${workoutData.lap} - ${workoutData.state}`;
+                            break;
+                        default:
+                            eventText = `📦 ${event.data}`;
+                    }
+                    
+                    return `
+                        <div class="workout-event ${eventType}">
+                            <div class="workout-time">⏰ ${event.time}</div>
+                            <div class="workout-data">${eventText}</div>
+                        </div>
+                    `;
+                } catch (e) {
+                    return `
+                        <div class="workout-event">
+                            <div class="workout-time">⏰ ${event.time}</div>
+                            <div class="workout-data">${event.data}</div>
+                        </div>
+                    `;
+                }
+            }).join('');
+        }
+
+        // Format milliseconds to MM:SS.mmm
+        function formatTime(ms) {
+            const minutes = Math.floor(ms / 60000);
+            const seconds = Math.floor((ms % 60000) / 1000);
+            const millis = ms % 1000;
+            return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${millis.toString().padStart(3, '0')}`;
+        }
+
+        // Update chart with new data
+        function updateChart() {
+            const labels = heartRateData.map(item => item.time);
+            const values = heartRateData.map(item => item.heart_rate);
+            
+            heartRateChart.data.labels = labels;
+            heartRateChart.data.datasets[0].data = values;
+            heartRateChart.update('none');
+        }
+
+        // Update statistics
+        function updateStats() {
+            if (heartRateData.length === 0) return;
+            
+            const values = heartRateData.map(item => item.heart_rate);
+            const current = values[values.length - 1];
+            const average = Math.round(values.reduce((a, b) => a + b, 0) / values.length);
+            const max = Math.max(...values);
+            
+            document.getElementById('currentHeartRate').textContent = current;
+            document.getElementById('averageHeartRate').textContent = average;
+            document.getElementById('maxHeartRate').textContent = max;
+        }
+
+        // Update status
+        function updateStatus(mode) {
+            const modeNames = {
+                '1': 'Fitness Mode',
+                '2': 'Lap Mode'
+            };
+            document.getElementById('currentMode').textContent = modeNames[mode] || 'None';
+        }
+
+        // Set mode
+        async function setMode(mode) {
+            try {
+                const response = await fetch('/api/set-mode', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ mode: mode })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    console.log('Mode set successfully:', result.message);
+                } else {
+                    console.error('Failed to set mode:', result.message);
+                }
+            } catch (error) {
+                console.error('Error setting mode:', error);
+            }
+        }
+
+        // Initialize
+        initChart();
+        
+        // Fetch data every 2 seconds
+        setInterval(fetchHeartRate, 2000);
+        setInterval(fetchWorkoutData, 2000);
+        
+        // Initial fetch
+        fetchHeartRate();
+        fetchWorkoutData();
+    </script>
+</body>
+</html>
