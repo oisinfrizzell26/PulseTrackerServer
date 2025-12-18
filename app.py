@@ -23,9 +23,9 @@ MQTT_PORT = 1883
 CLIENT_ID = "pulsetracker_flask_server"
 
 # Topics
-TOPIC_MODE = "pulsetracker/mode"
 TOPIC_HEART = "pulsetracker/heartRate"
 TOPIC_WORKOUT = "pulsetracker/workout"
+TOPIC_BUZZER = "pulsetracker/buzzer"
 
 # Global variables to store data
 heart_rate_data = []
@@ -52,10 +52,9 @@ def on_connect(client, userdata, flags, reason_code, properties):
         # Only print on very first connection
         if not mqtt_connected_once:
             print("✅ Connected to MQTT broker")
-            print(f"📡 Subscribed to: {TOPIC_HEART}, {TOPIC_MODE}, {TOPIC_WORKOUT}")
+            print(f"📡 Subscribed to: {TOPIC_HEART}, {TOPIC_WORKOUT}")
             mqtt_connected_once = True
         client.subscribe(TOPIC_HEART)
-        client.subscribe(TOPIC_MODE)
         client.subscribe(TOPIC_WORKOUT)
 
 def on_message(client, userdata, msg):
@@ -88,10 +87,6 @@ def on_message(client, userdata, msg):
         
         # Save to database
         WorkoutDatabase.add_heart_rate(heart_rate, current_workout_id, current_mode)
-    
-    elif topic == TOPIC_MODE:
-        print(f"📥 Mode update: {payload}")
-        current_mode = payload
     
     elif topic == TOPIC_WORKOUT:
         print(f"\n🏋️  WORKOUT DATA RECEIVED 🏋️")
@@ -247,22 +242,16 @@ def get_workouts_by_category():
     categories = WorkoutDatabase.get_workouts_by_category()
     return jsonify(categories)
 
-@app.route('/api/set-mode', methods=['POST'])
-def set_mode():
+@app.route('/api/trigger-buzzer', methods=['POST'])
+def trigger_buzzer():
     global mqtt_client
     
-    data = request.get_json()
-    mode = data.get('mode')
-    
-    if mode in ['1', '2']:
-        if mqtt_client:
-            mqtt_client.publish(TOPIC_MODE, mode)
-            mode_name = "Fitness Mode" if mode == "1" else "Lap Mode"
-            return jsonify({'success': True, 'message': f'Set to {mode_name}'})
-        else:
-            return jsonify({'success': False, 'message': 'MQTT not connected'})
-    
-    return jsonify({'success': False, 'message': 'Invalid mode'})
+    if mqtt_client:
+        mqtt_client.publish(TOPIC_BUZZER, "1")
+        print("🔔 Buzzer triggered from dashboard")
+        return jsonify({'success': True, 'message': 'Buzzer triggered'})
+    else:
+        return jsonify({'success': False, 'message': 'MQTT not connected'})
 
 if __name__ == '__main__':
     # Setup MQTT in a separate thread

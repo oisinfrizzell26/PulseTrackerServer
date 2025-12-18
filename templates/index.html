@@ -203,9 +203,8 @@
         </div>
 
         <div class="card controls">
-            <h3>Running Modes</h3>
-            <button class="btn" onclick="setMode('1')">🏃‍♂️ Fitness Mode</button>
-            <button class="btn" onclick="setMode('2')">🏁 Lap Mode</button>
+            <h3>Training Controls</h3>
+            <button class="btn" onclick="triggerBuzzer()">⚠️ Behind Time</button>
         </div>
 
         <div class="card">
@@ -426,25 +425,25 @@
             document.getElementById('currentMode').textContent = modeNames[mode] || 'None';
         }
 
-        // Set mode
-        async function setMode(mode) {
+        // Trigger buzzer
+        async function triggerBuzzer() {
             try {
-                const response = await fetch('/api/set-mode', {
+                const response = await fetch('/api/trigger-buzzer', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ mode: mode })
+                    body: JSON.stringify({})
                 });
                 
                 const result = await response.json();
                 if (result.success) {
-                    // Mode changed successfully
+                    console.log('Buzzer triggered');
                 } else {
-                    console.error('Failed to set mode:', result.message);
+                    console.error('Failed to trigger buzzer:', result.message);
                 }
             } catch (error) {
-                console.error('Error setting mode:', error);
+                console.error('Error triggering buzzer:', error);
             }
         }
 
