@@ -8,7 +8,7 @@ import logging
 from database import init_database, WorkoutDatabase
 
 app = Flask(__name__)
-init_database()  # Initialize database on startup
+init_database()
 
 # Disable Flask's request logging
 log = logging.getLogger('werkzeug')
@@ -18,7 +18,7 @@ log.setLevel(logging.ERROR)
 data_lock = threading.Lock()
 
 # MQTT Configuration
-MQTT_BROKER = "alderaan.software-engineering.ie"  # Remote MQTT broker
+MQTT_BROKER = "alderaan.software-engineering.ie"
 MQTT_PORT = 1883
 CLIENT_ID = "pulsetracker_flask_server"
 
@@ -31,7 +31,7 @@ TOPIC_BUZZER = "pulsetracker/buzzer"
 heart_rate_data = []
 current_mode = "None"
 workout_data = []
-current_workout_id = None  # Track active workout in database
+current_workout_id = None
 current_workout_status = {
     'active': False,
     'mode': '',
@@ -42,14 +42,13 @@ current_workout_status = {
     'started_at': None
 }
 mqtt_client = None
-mqtt_connected_once = False  # Track if we've already printed connection message
+mqtt_connected_once = False
 
 def on_connect(client, userdata, flags, reason_code, properties):
     global mqtt_connected_once
     if reason_code.is_failure:
         print(f"❌ MQTT Connection failed with code {reason_code}")
     else:
-        # Only print on very first connection
         if not mqtt_connected_once:
             print("✅ Connected to MQTT broker")
             print(f"📡 Subscribed to: {TOPIC_HEART}, {TOPIC_WORKOUT}")
@@ -68,24 +67,20 @@ def on_message(client, userdata, msg):
     
     if topic == TOPIC_HEART:
         print(f"❤️ Heart rate: {payload}")
-        # Validate and parse heart rate (backward compatible with original behavior)
         if not payload.isdigit():
             print(f"⚠️  Warning: Invalid heart rate data '{payload}', storing as 0")
             heart_rate = 0
         else:
             heart_rate = int(payload)
         
-        # Store heart rate data with timestamp (thread-safe)
         with data_lock:
             heart_rate_data.append({
                 'time': timestamp,
                 'heart_rate': heart_rate
             })
-            # Keep only last 50 readings
             if len(heart_rate_data) > 50:
                 heart_rate_data.pop(0)
         
-        # Save to database
         WorkoutDatabase.add_heart_rate(heart_rate, current_workout_id, current_mode)
     
     elif topic == TOPIC_WORKOUT:
@@ -94,7 +89,6 @@ def on_message(client, userdata, msg):
         print(f"📦 Payload: {payload}")
         print("=" * 60)
         
-        # Parse workout data and update current status
         try:
             workout_json = json.loads(payload)
             event_type = workout_json.get('event', '')
@@ -103,7 +97,6 @@ def on_message(client, userdata, msg):
                 mode = workout_json.get('mode', 'Unknown')
                 total_laps = workout_json.get('laps', 0)
                 
-                # Create new workout in database
                 current_workout_id = WorkoutDatabase.create_workout(mode, total_laps)
                 
                 current_workout_status['active'] = True
@@ -119,7 +112,6 @@ def on_message(client, userdata, msg):
                 lap_time_ms = workout_json.get('lap_ms', 0)
                 split_time_ms = workout_json.get('split_ms', 0)
                 
-                # Save lap to database
                 if current_workout_id:
                     WorkoutDatabase.add_lap(current_workout_id, lap_num, lap_time_ms, split_time_ms)
                 
@@ -129,7 +121,6 @@ def on_message(client, userdata, msg):
                 total_laps = workout_json.get('laps', 0)
                 total_time_ms = workout_json.get('total_ms', 0)
                 
-                # Mark workout as completed in database
                 if current_workout_id:
                     WorkoutDatabase.complete_workout(current_workout_id, total_laps, total_time_ms, 'completed')
                 
@@ -141,7 +132,6 @@ def on_message(client, userdata, msg):
                 total_laps = workout_json.get('laps', 0)
                 total_time_ms = workout_json.get('total_ms', 0)
                 
-                # Mark workout as stopped in database
                 if current_workout_id:
                     WorkoutDatabase.complete_workout(current_workout_id, total_laps, total_time_ms, 'stopped')
                 
@@ -156,13 +146,11 @@ def on_message(client, userdata, msg):
             print(f"❌ Error parsing workout data: {e}")
             print(f"   Payload was: {payload}")
         
-        # Store workout data with timestamp (thread-safe)
         with data_lock:
             workout_data.append({
                 'time': timestamp,
                 'data': payload
             })
-            # Keep only last 100 workout events
             if len(workout_data) > 100:
                 workout_data.pop(0)
 
@@ -254,16 +242,13 @@ def trigger_buzzer():
         return jsonify({'success': False, 'message': 'MQTT not connected'})
 
 if __name__ == '__main__':
-    # Setup MQTT in a separate thread
     mqtt_thread = threading.Thread(target=setup_mqtt)
     mqtt_thread.daemon = True
     mqtt_thread.start()
     
-    # Give MQTT time to connect
     time.sleep(2)
     
     print("🚀 Starting PulseTracker Flask Server")
     print("🌐 Open browser to: http://localhost:8080")
     
-    # Disable reloader to prevent MQTT connection issues
     app.run(host='0.0.0.0', port=8080, debug=True, use_reloader=False)

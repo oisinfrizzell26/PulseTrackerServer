@@ -19,7 +19,6 @@ def init_database():
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    # Workouts table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS workouts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -35,7 +34,6 @@ def init_database():
         )
     ''')
     
-    # Laps table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS laps (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -50,7 +48,6 @@ def init_database():
         )
     ''')
     
-    # Heart rate data table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS heart_rate_data (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -104,7 +101,6 @@ class WorkoutDatabase:
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Get heart rate stats
         cursor.execute('''
             SELECT AVG(heart_rate) as avg_hr, MAX(heart_rate) as max_hr, MIN(heart_rate) as min_hr
             FROM heart_rate_data
@@ -112,7 +108,6 @@ class WorkoutDatabase:
         ''', (workout_id,))
         hr_stats = cursor.fetchone()
         
-        # Handle None values and convert avg to int
         avg_hr = int(hr_stats['avg_hr']) if hr_stats['avg_hr'] is not None else None
         max_hr = hr_stats['max_hr']
         min_hr = hr_stats['min_hr']
@@ -164,7 +159,6 @@ class WorkoutDatabase:
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Get workout
         cursor.execute('SELECT * FROM workouts WHERE id = ?', (workout_id,))
         workout = cursor.fetchone()
         
@@ -172,7 +166,6 @@ class WorkoutDatabase:
             conn.close()
             return None
         
-        # Get laps
         cursor.execute('''
             SELECT * FROM laps
             WHERE workout_id = ?
@@ -180,7 +173,6 @@ class WorkoutDatabase:
         ''', (workout_id,))
         laps = cursor.fetchall()
         
-        # Get heart rate data
         cursor.execute('''
             SELECT heart_rate, recorded_at FROM heart_rate_data
             WHERE workout_id = ?
@@ -225,7 +217,6 @@ class WorkoutDatabase:
         all_workouts = cursor.fetchall()
         conn.close()
         
-        # Group by mode/distance
         categories = {}
         for workout in all_workouts:
             workout_dict = dict(workout)
@@ -237,6 +228,5 @@ class WorkoutDatabase:
         return categories
 
 if __name__ == '__main__':
-    # Initialize database when run directly
     init_database()
     print("Database setup complete!")
